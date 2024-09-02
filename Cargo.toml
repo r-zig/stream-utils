@@ -1,0 +1,16 @@
+[package]
+name = "stream-utils"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ron Zigelman <roniz.net@gmail.com>"]
+
+[dependencies]
+futures = "0.3.30"
+pin-project = "1.1.5"
+tokio = { version = "1.39.2", features = ["full"] }
+tokio-stream = { version = "0.1.15", features = ["fs"] }
+tracing = "0.1.40"
+
+[dev-dependencies]
+tempfile = "3.12.0"
+tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter"] }
