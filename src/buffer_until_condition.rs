@@ -16,8 +16,8 @@ pub struct BufferUntilCondition<S: Stream, F: Fn(&S::Item) -> bool> {
 
 impl<S, F> BufferUntilCondition<S, F>
 where
-    S: Stream + Unpin,
-    F: Fn(&S::Item) -> bool,
+    S: Stream + Unpin + Send + 'static,
+    F: Fn(&S::Item) -> bool + Send + 'static,
 {
     pub fn new(stream: S, condition: F) -> Self {
         BufferUntilCondition {

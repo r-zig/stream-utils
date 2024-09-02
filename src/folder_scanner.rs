@@ -15,7 +15,7 @@ use tokio_stream::wrappers::ReadDirStream;
 /// Reading: Actually reading the current directory using the current stream that obtained previously.
 enum State {
     Next,
-    Prepare(Pin<Box<dyn Future<Output = Result<ReadDir, std::io::Error>>>>),
+    Prepare(Pin<Box<dyn Future<Output = Result<ReadDir, std::io::Error>> + Send>>),
     Reading(ReadDirStream),
 }
 
