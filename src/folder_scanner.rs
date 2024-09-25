@@ -2,6 +2,7 @@ use futures::stream::{Stream, StreamExt};
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -54,6 +55,16 @@ impl Stream for RecursiveFileStream {
             match &mut this.state {
                 State::Next => {
                     if let Some(dir) = this.dirs.pop_front() {
+                        if dir.starts_with("~") {
+                            this.state = State::Next;
+                            let path_error = PathError {
+                                message: String::from("Paths with '~' are not expanded automatically. Please provide the full path."),
+                                path: dir,
+                            };
+                            // Wrap the custom error in std::io::Error
+                            let io_error = io::Error::new(io::ErrorKind::InvalidInput, path_error);
+                            return Poll::Ready(Some(Err(io_error)));
+                        }
                         // Prepare the next directory to read
                         let read_dir = fs::read_dir(dir.clone());
                         this.state = State::Prepare(Box::pin(read_dir));
@@ -101,12 +112,49 @@ impl Stream for RecursiveFileStream {
     }
 }
 
+use std::fmt;
+
+#[derive(Debug)]
+struct PathError {
+    message: String,
+    path: PathBuf,
+}
+
+impl fmt::Display for PathError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {:?}", self.message, self.path)
+    }
+}
+
+impl std::error::Error for PathError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use futures::stream::StreamExt;
     use tempfile::tempdir;
     use tokio::fs::{self, File};
+
+    #[tokio::test]
+    async fn test_read_dir_with_tilde() {
+        let path = PathBuf::from("~/Documents/");
+        let mut stream = RecursiveFileStream::new(&path);
+
+        if let Some(Err(e)) = stream.next().await {
+            // Attempt to downcast to the custom PathError
+            e.get_ref()
+                .and_then(|err| err.downcast_ref::<PathError>())
+                .expect("The test should have failed with a tilde (~) in the path.");
+
+            // Ensure the error message matches
+            assert_eq!(
+            e.to_string(),
+            format!("Paths with '~' are not expanded automatically. Please provide the full path.: \"{}\"",path.to_string_lossy())
+        );
+        } else {
+            panic!("The test should have failed with a tilde (~) in the path.");
+        }
+    }
 
     #[tokio::test]
     async fn test_empty_directory() {
